@@ -89,7 +89,7 @@ adi_set_bus_dependency "m_src_axi" "m_src_axi" \
 adi_set_bus_dependency "m_dest_axi" "m_dest_axi" \
 	"(spirit:decode(id('MODELPARAM_VALUE.DMA_TYPE_DEST')) = 0)"
 adi_set_bus_dependency "m_sg_axi" "m_sg_axi" \
-	"(spirit:decode(id('MODELPARAM_VALUE.DMA_2D_TRANSFER')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.DMA_SG_TRANSFER')) = 1)"
 adi_set_bus_dependency "s_axis" "s_axis" \
 	"(spirit:decode(id('MODELPARAM_VALUE.DMA_TYPE_SRC')) = 1)"
 adi_set_bus_dependency "m_axis" "m_axis" \

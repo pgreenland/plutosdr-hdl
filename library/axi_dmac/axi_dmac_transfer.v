@@ -46,7 +46,8 @@ module axi_dmac_transfer #(
   parameter DMA_TYPE_DEST = 0,
   parameter DMA_TYPE_SRC = 2,
   parameter DMA_AXI_ADDR_WIDTH = 32,
-  parameter DMA_2D_TRANSFER = 1,
+  parameter DMA_2D_TRANSFER = 0,
+  parameter DMA_SG_TRANSFER = 0,
   parameter ASYNC_CLK_REQ_SRC = 1,
   parameter ASYNC_CLK_SRC_DEST = 1,
   parameter ASYNC_CLK_DEST_REQ = 1,
@@ -83,8 +84,8 @@ module axi_dmac_transfer #(
   input req_last,
   output req_arb_enable,
 
-  output reg req_eot,
-  output reg [31:0] req_sg_desc_id,
+  output req_eot,
+  output [31:0] req_sg_desc_id,
   output [BYTES_PER_BURST_WIDTH-1:0] req_measured_burst_length,
   output req_response_partial,
   output req_response_valid,
@@ -212,9 +213,20 @@ module axi_dmac_transfer #(
   wire dma_response_partial;
   wire dma_req_sync_transfer_start;
   wire dma_req_last;
+
+  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_DEST] dma_sg_out_dest_address;
+  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SRC] dma_sg_out_src_address;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_x_length;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_y_length;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_src_stride;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_dst_stride;
   wire [31:0] dma_sg_hwdesc_id;
   wire dma_sg_hwdesc_eot;
-  wire dma_sg_out_valid;
+  wire dma_sg_in_eot;
+  wire dma_sg_in_req_valid;
+  wire dma_sg_in_req_ready;
+  wire dma_sg_out_req_valid;
+  wire dma_sg_out_req_ready;
 
   wire req_clk = ctrl_clk;
   wire req_resetn;
@@ -276,54 +288,13 @@ module axi_dmac_transfer #(
   assign req_valid_gated = req_enable & req_valid;
   assign req_ready = req_enable & req_ready_gated;
 
-  always @(posedge ctrl_clk) begin
-    if (ctrl_hwdesc == 1'b1) begin
-      if (dma_sg_out_valid == 1'b1) begin
-        req_sg_desc_id <= dma_sg_hwdesc_id;
-        req_eot <= dma_sg_hwdesc_eot;
-      end else begin
-        req_eot <= 1'b0;
-      end
-    end else begin
-      req_eot <= dma_req_eot;
-    end
-  end
-
-  generate if (DMA_2D_TRANSFER == 1) begin
-
-  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_DEST] dma_2d_dest_address;
-  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SRC] dma_2d_src_address;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_x_length;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_y_length;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_src_stride;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_dst_stride;
-  wire dma_2d_eot;
-
-  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_DEST] dma_sg_out_dest_address;
-  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SRC] dma_sg_out_src_address;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_x_length;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_y_length;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_src_stride;
-  wire [DMA_LENGTH_WIDTH-1:0] dma_sg_dst_stride;
-
-  wire dma_2d_req_valid;
-  wire dma_2d_req_ready;
-  wire dma_sg_in_req_valid;
-  wire dma_sg_in_req_ready;
-  wire dma_sg_out_req_valid;
-
   assign req_arb_enable = ctrl_enable || !dma_sg_in_req_ready;
-
-  assign dma_2d_dest_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_dest_address : req_dest_address;
-  assign dma_2d_src_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_src_address : req_src_address;
-  assign dma_2d_x_length = ctrl_hwdesc == 1'b1 ? dma_sg_x_length : req_x_length;
-  assign dma_2d_y_length = ctrl_hwdesc == 1'b1 ? dma_sg_y_length : req_y_length;
-  assign dma_2d_src_stride = ctrl_hwdesc == 1'b1 ? dma_sg_src_stride : req_src_stride;
-  assign dma_2d_dst_stride = ctrl_hwdesc == 1'b1 ? dma_sg_dst_stride : req_dest_stride;
-
+  assign req_eot = ctrl_hwdesc == 1'b1 ? (dma_sg_in_eot & dma_sg_hwdesc_eot) : dma_req_eot;
+  assign req_sg_desc_id = ctrl_hwdesc == 1'b1 ? dma_sg_hwdesc_id : 'h00;
   assign dma_sg_in_req_valid = ctrl_hwdesc == 1'b1 ? req_valid_gated : 1'b0;
-  assign dma_2d_req_valid = ctrl_hwdesc == 1'b1 ? dma_sg_out_req_valid : req_valid_gated;
-  assign req_ready_gated = ctrl_hwdesc == 1'b1 ? dma_sg_in_req_ready : dma_2d_req_ready;
+
+  /* SG Interface */
+  generate if (DMA_SG_TRANSFER == 1) begin
 
   dmac_sg #(
     .DMA_AXI_ADDR_WIDTH(DMA_AXI_ADDR_WIDTH),
@@ -343,7 +314,7 @@ module axi_dmac_transfer #(
     .req_in_ready(dma_sg_in_req_ready),
 
     .req_out_valid(dma_sg_out_req_valid),
-    .req_out_ready(dma_2d_req_ready),
+    .req_out_ready(dma_sg_out_req_ready),
 
     .req_desc_address(req_sg_address),
 
@@ -356,8 +327,7 @@ module axi_dmac_transfer #(
     .out_src_stride(dma_sg_src_stride),
     .resp_out_id(dma_sg_hwdesc_id),
     .resp_out_eot(dma_sg_hwdesc_eot),
-    .resp_in_valid(dma_2d_eot),
-    .resp_out_valid(dma_sg_out_valid),
+    .resp_in_valid(dma_sg_in_eot),
 
     .m_axi_arready(m_sg_axi_arready),
     .m_axi_arvalid(m_sg_axi_arvalid),
@@ -372,6 +342,47 @@ module axi_dmac_transfer #(
     .m_axi_rready(m_sg_axi_rready),
     .m_axi_rvalid(m_sg_axi_rvalid),
     .m_axi_rresp(m_sg_axi_rresp));
+
+  end else begin
+
+    assign dma_sg_in_req_ready = 1'b0;
+    assign dma_sg_out_req_valid = 1'b0;
+    assign dma_sg_hwdesc_eot = 1'b0;
+    assign dma_sg_out_dest_address = 'h00;
+    assign dma_sg_out_src_address = 'h00;
+    assign dma_sg_x_length = 'h00;
+    assign dma_sg_y_length = 'h00;
+    assign dma_sg_dst_stride = 'h00;
+    assign dma_sg_src_stride = 'h00;
+    assign dma_sg_hwdesc_id = 'h00;
+ 
+  end endgenerate
+
+  /* 2D Interface */
+  generate if (DMA_2D_TRANSFER == 1) begin
+
+  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_DEST] dma_2d_dest_address;
+  wire [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SRC] dma_2d_src_address;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_x_length;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_y_length;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_src_stride;
+  wire [DMA_LENGTH_WIDTH-1:0] dma_2d_dst_stride;
+  wire dma_2d_eot;
+
+  wire dma_2d_req_valid;
+  wire dma_2d_req_ready;
+
+  assign dma_2d_dest_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_dest_address : req_dest_address;
+  assign dma_2d_src_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_src_address : req_src_address;
+  assign dma_2d_x_length = ctrl_hwdesc == 1'b1 ? dma_sg_x_length : req_x_length;
+  assign dma_2d_y_length = ctrl_hwdesc == 1'b1 ? dma_sg_y_length : req_y_length;
+  assign dma_2d_src_stride = ctrl_hwdesc == 1'b1 ? dma_sg_src_stride : req_src_stride;
+  assign dma_2d_dst_stride = ctrl_hwdesc == 1'b1 ? dma_sg_dst_stride : req_dest_stride;
+
+  assign dma_2d_req_valid = ctrl_hwdesc == 1'b1 ? dma_sg_out_req_valid : req_valid_gated;
+  assign req_ready_gated = ctrl_hwdesc == 1'b1 ? dma_sg_in_req_ready : dma_2d_req_ready;
+  assign dma_sg_in_eot = dma_2d_eot;
+  assign dma_sg_out_req_ready = dma_2d_req_ready;
 
   dmac_2d_transfer #(
     .DMA_AXI_ADDR_WIDTH(DMA_AXI_ADDR_WIDTH),
@@ -416,15 +427,15 @@ module axi_dmac_transfer #(
 
   end else begin
 
-  assign req_arb_enable = ctrl_enable;
-
   /* Request */
-  assign dma_req_valid = req_valid_gated;
-  assign req_ready_gated = dma_req_ready;
+  assign dma_req_valid = ctrl_hwdesc == 1'b1 ? dma_sg_out_req_valid : req_valid_gated;
+  assign req_ready_gated = ctrl_hwdesc == 1'b1 ? dma_sg_in_req_ready : dma_req_ready;
+  assign dma_sg_in_eot = dma_req_eot;
+  assign dma_sg_out_req_ready = dma_req_ready;
 
-  assign dma_req_dest_address = req_dest_address;
-  assign dma_req_src_address = req_src_address;
-  assign dma_req_length = req_x_length;
+  assign dma_req_dest_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_dest_address : req_dest_address;
+  assign dma_req_src_address = ctrl_hwdesc == 1'b1 ? dma_sg_out_src_address : req_src_address;
+  assign dma_req_length = ctrl_hwdesc == 1'b1 ? dma_sg_x_length : req_x_length;
   assign dma_req_sync_transfer_start = req_sync_transfer_start;
   assign dma_req_last = req_last;
 

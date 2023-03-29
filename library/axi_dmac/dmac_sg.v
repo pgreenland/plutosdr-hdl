@@ -55,6 +55,7 @@ module dmac_sg #(
   output req_out_valid,
   input req_out_ready,
 
+  output resp_out_eot,
   input resp_in_valid,
 
   input [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SG] req_desc_address,
@@ -66,8 +67,6 @@ module dmac_sg #(
   output [DMA_LENGTH_WIDTH-1:0] out_dest_stride,
   output [DMA_LENGTH_WIDTH-1:0] out_src_stride,
   output [31:0] resp_out_id,
-  output resp_out_eot,
-  output resp_out_valid,
 
   // Read address
   input                            m_axi_arready,
@@ -135,20 +134,32 @@ module dmac_sg #(
   assign m_axi_araddr  = {next_desc_addr, {BYTES_PER_BEAT_WIDTH_SG{1'b0}}};
 
   always @(posedge m_axi_aclk) begin
-    if (m_axi_rvalid) begin
+    if (m_axi_aresetn == 1'b0) begin
+      hwdesc_counter <= 'h0;
+    end else if (m_axi_rvalid) begin
       hwdesc_counter <= hwdesc_counter + 1'b1;
-    end else if (hwdesc_state == STATE_RECV_DESC) begin
-      hwdesc_counter <= 1'b0;
+    end else if (hwdesc_state == STATE_DESC_READY) begin
+      hwdesc_counter <= 'h0;
     end
   end
 
   always @(posedge m_axi_aclk) begin
-    if (hwdesc_state == STATE_IDLE) begin
-      next_desc_addr <= req_desc_address;
-    end
-
-    if (m_axi_rvalid) begin
-      case (hwdesc_counter)
+    if (m_axi_aresetn == 1'b0) begin
+      hwdesc_flags <= 'h00;
+      hwdesc_id <= 'h00;
+      dest_addr <= 'h00;
+      src_addr <= 'h00;
+      next_desc_addr <= 'h00;
+      y_length <= 'h00;
+      x_length <= 'h00;
+      src_stride <= 'h00;
+      dest_stride <= 'h00;
+    end else begin
+      if (hwdesc_state == STATE_IDLE) begin
+        next_desc_addr <= req_desc_address;
+      end
+      if (m_axi_rvalid) begin
+        case (hwdesc_counter)
         0: begin
           hwdesc_id <= m_axi_rdata[63:32];
           hwdesc_flags <= m_axi_rdata[31:0];
@@ -164,7 +175,8 @@ module dmac_sg #(
           dest_stride <= m_axi_rdata[63:32];
           src_stride <= m_axi_rdata[31:0];
           end
-      endcase
+        endcase
+      end
     end
   end
 
@@ -248,6 +260,5 @@ module dmac_sg #(
     .m_axis_data({resp_out_eot, resp_out_id}));
 
   assign fifo_out_ready = resp_in_valid;
-  assign resp_out_valid = resp_in_valid;
 
 endmodule

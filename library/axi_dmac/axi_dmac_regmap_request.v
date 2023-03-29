@@ -48,6 +48,7 @@ module axi_dmac_regmap_request #(
   parameter HAS_DEST_ADDR = 1,
   parameter HAS_SRC_ADDR = 1,
   parameter DMA_2D_TRANSFER = 0,
+  parameter DMA_SG_TRANSFER = 0,
   parameter SYNC_TRANSFER_START = 0
 ) (
   input clk,
@@ -107,7 +108,6 @@ module axi_dmac_regmap_request #(
 
   reg [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_DEST] up_dma_dest_address = 'h00;
   reg [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SRC]  up_dma_src_address = 'h00;
-  reg [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SG]  up_dma_sg_address = 'h00;
   reg [DMA_LENGTH_WIDTH-1:0] up_dma_x_length = {DMA_LENGTH_ALIGN{1'b1}};
   reg up_dma_cyclic = DMA_CYCLIC ? 1'b1 : 1'b0;
   reg up_dma_last = 1'b1;
@@ -128,7 +128,6 @@ module axi_dmac_regmap_request #(
 
   assign request_dest_address = up_dma_dest_address;
   assign request_src_address = up_dma_src_address;
-  assign request_sg_address = up_dma_sg_address;
   assign request_x_length = up_dma_x_length;
   assign request_sync_transfer_start = SYNC_TRANSFER_START ? 1'b1 : 1'b0;
   assign request_last = up_dma_last;
@@ -137,7 +136,6 @@ module axi_dmac_regmap_request #(
     if (reset == 1'b1) begin
       up_dma_dest_address <= 'h00;
       up_dma_src_address <= 'h00;
-      up_dma_sg_address <= 'h00;
       up_dma_x_length[DMA_LENGTH_WIDTH-1:DMA_LENGTH_ALIGN] <= 'h00;
       up_dma_req_valid <= 1'b0;
       up_dma_cyclic <= DMA_CYCLIC ? 1'b1 : 1'b0;
@@ -164,7 +162,6 @@ module axi_dmac_regmap_request #(
         9'h104: up_dma_dest_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_DEST] <= up_wdata[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_DEST];
         9'h105: up_dma_src_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SRC] <= up_wdata[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SRC];
         9'h106: up_dma_x_length[DMA_LENGTH_WIDTH-1:DMA_LENGTH_ALIGN] <= up_wdata[DMA_LENGTH_WIDTH-1:DMA_LENGTH_ALIGN];
-        9'h11f: up_dma_sg_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG] <= up_wdata[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG];
         9'h124:
           if (HAS_ADDR_HIGH) begin
             up_dma_dest_address[DMA_AXI_ADDR_WIDTH-1:32] <= up_wdata[ADDR_HIGH_MSB:0];
@@ -172,10 +169,6 @@ module axi_dmac_regmap_request #(
         9'h125:
           if (HAS_ADDR_HIGH) begin
             up_dma_src_address[DMA_AXI_ADDR_WIDTH-1:32] <= up_wdata[ADDR_HIGH_MSB:0];
-          end
-        9'h12f:
-          if (HAS_ADDR_HIGH) begin
-            up_dma_sg_address[DMA_AXI_ADDR_WIDTH-1:32] <= up_wdata[ADDR_HIGH_MSB:0];
           end
         endcase
       end
@@ -200,10 +193,10 @@ module axi_dmac_regmap_request #(
     9'h113: up_rdata <= up_tlf_data[MEASURED_LENGTH_WIDTH-1 : 0];   // Length
     9'h114: up_rdata <= up_tlf_data[MEASURED_LENGTH_WIDTH+: 2];  // ID
     9'h115: up_rdata <= response_sg_desc_id;
-    9'h11f: up_rdata <= {up_dma_sg_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG],{BYTES_PER_BEAT_WIDTH_SG{1'b0}}};
+    9'h11f: up_rdata <= {request_sg_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG],{BYTES_PER_BEAT_WIDTH_SG{1'b0}}};
     9'h124: up_rdata <= (HAS_ADDR_HIGH && HAS_DEST_ADDR) ? up_dma_dest_address[DMA_AXI_ADDR_WIDTH-1:32] : 32'h00;
     9'h125: up_rdata <= (HAS_ADDR_HIGH && HAS_SRC_ADDR) ? up_dma_src_address[DMA_AXI_ADDR_WIDTH-1:32] : 32'h00;
-    9'h12f: up_rdata <= HAS_ADDR_HIGH ? up_dma_sg_address[DMA_AXI_ADDR_WIDTH-1:32] : 32'h00;
+    9'h12f: up_rdata <= HAS_ADDR_HIGH ? request_sg_address[DMA_AXI_ADDR_WIDTH-1:32] : 32'h00;
     default: up_rdata <= 32'h00;
     endcase
   end
@@ -234,6 +227,29 @@ module axi_dmac_regmap_request #(
     assign request_y_length = 'h0;
     assign request_dest_stride = 'h0;
     assign request_src_stride = 'h0;
+  end
+  endgenerate
+
+  generate
+  if (DMA_SG_TRANSFER == 1) begin
+    reg [DMA_AXI_ADDR_WIDTH-1:BYTES_PER_BEAT_WIDTH_SG]  up_dma_sg_address = 'h00;
+
+    always @(posedge clk) begin
+      if (reset == 1'b1) begin
+        up_dma_sg_address <= 'h00;
+      end else if (up_wreq == 1'b1) begin
+        case (up_waddr)
+        9'h11f: up_dma_sg_address[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG] <= up_wdata[ADDR_LOW_MSB:BYTES_PER_BEAT_WIDTH_SG];
+        9'h12f:
+          if (HAS_ADDR_HIGH) begin
+            up_dma_sg_address[DMA_AXI_ADDR_WIDTH-1:32] <= up_wdata[ADDR_HIGH_MSB:0];
+          end
+        endcase
+      end
+    end
+    assign request_sg_address = up_dma_sg_address;
+  end else begin
+    assign request_sg_address = 'h00;
   end
   endgenerate
 

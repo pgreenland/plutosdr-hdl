@@ -51,6 +51,7 @@ module axi_dmac_regmap #(
   parameter HAS_DEST_ADDR = 1,
   parameter HAS_SRC_ADDR = 1,
   parameter DMA_2D_TRANSFER = 0,
+  parameter DMA_SG_TRANSFER = 0,
   parameter SYNC_TRANSFER_START = 0,
   parameter CACHE_COHERENT_DEST = 0
 ) (
@@ -188,9 +189,17 @@ module axi_dmac_regmap #(
 
       if (up_wreq == 1'b1) begin
         case (up_waddr)
-        9'h002: up_scratch <= up_wdata;
-        9'h020: up_irq_mask <= up_wdata[1:0];
-        9'h100: {ctrl_hwdesc, ctrl_pause, ctrl_enable} <= up_wdata[2:0];
+        9'h002: begin
+          up_scratch <= up_wdata;
+          end
+        9'h020: begin
+          up_irq_mask <= up_wdata[1:0];
+          end
+        9'h100: begin
+          ctrl_hwdesc <= up_wdata[2] & DMA_SG_TRANSFER;
+          ctrl_pause <= up_wdata[1];
+          ctrl_enable <= up_wdata[0];
+          end
         endcase
       end
     end
@@ -245,6 +254,7 @@ module axi_dmac_regmap #(
     .HAS_DEST_ADDR(HAS_DEST_ADDR),
     .HAS_SRC_ADDR(HAS_SRC_ADDR),
     .DMA_2D_TRANSFER(DMA_2D_TRANSFER),
+    .DMA_SG_TRANSFER(DMA_SG_TRANSFER),
     .SYNC_TRANSFER_START(SYNC_TRANSFER_START)
   ) i_regmap_request (
     .clk(s_axi_aclk),
