@@ -47,15 +47,9 @@ module axi_adxcvr_up #(
   parameter   [15:0]  FPGA_VOLTAGE = 0,
   parameter   integer XCVR_TYPE = 0,
   parameter   integer TX_OR_RX_N = 0,
-<<<<<<< HEAD
-  parameter   integer NUM_OF_LANES = 4
-) (
-
-=======
   parameter   integer NUM_OF_LANES = 4,
   parameter           READY_W = (FPGA_TECHNOLOGY != 105) ?  NUM_OF_LANES : 1
 ) (
->>>>>>> 13f53f2f1 (intel/axi_adxcvr: Fixes)
   // xcvr, lane-pll and ref-pll are shared
 
   output                        up_rst,
