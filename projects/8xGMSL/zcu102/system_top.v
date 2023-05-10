@@ -45,6 +45,9 @@ module system_top (
   output                  sfp_tx_n,
   output                  sfp_tx_p,
 
+  inout                   pl_i2c1_scl,
+  inout                   pl_i2c1_sda,
+
   input                   sfp_ref_clk_p,
   input                   sfp_ref_clk_n);
 
@@ -86,6 +89,9 @@ module system_top (
     .tx_tod_ns_0 (tx_tod_ns_0),
     .rx_tod_sec_0 (rx_tod_sec_0),
     .rx_tod_ns_0 (rx_tod_ns_0),
+
+    .pl_iic_scl_io (pl_i2c1_scl),
+    .pl_iic_sda_io (pl_i2c1_sda),
 
     .spi0_sclk (),
     .spi0_csn (spi_csn),

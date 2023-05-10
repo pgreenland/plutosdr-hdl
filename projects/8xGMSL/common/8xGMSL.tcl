@@ -2,6 +2,13 @@ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 sf
 set_property CONFIG.FREQ_HZ 156250000 [get_bd_intf_ports /sfp_ref_clk_0]
 
 create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gt_rtl:1.0 sfp_txr
+create_bd_intf_port -mode Master -vlnv xilinx.com:interface:iic_rtl:1.0 pl_iic
+
+ad_ip_instance axi_gpio axi_gpio_qpllreset
+ad_ip_parameter axi_gpio_qpllreset CONFIG.C_IS_DUAL 0
+ad_ip_parameter axi_gpio_qpllreset CONFIG.C_GPIO_WIDTH 1
+
+ad_ip_instance axi_iic axi_pl_iic
 
 ad_ip_instance xxv_ethernet ethernet_sfp
 ad_ip_parameter ethernet_sfp CONFIG.ADD_GT_CNTRL_STS_PORTS {0}
@@ -86,6 +93,11 @@ ad_ip_instance xlconstant const_2
 ad_ip_parameter const_2 CONFIG.CONST_WIDTH 56
 ad_ip_parameter const_2 CONFIG.CONST_VAL 0
 
+#
+
+ad_connect axi_gpio_qpllreset/gpio_io_o ethernet_sfp/qpllreset_in_0
+ad_connect axi_pl_iic/IIC pl_iic
+
 ad_connect tx_stream_fifo/m_axis ethernet_sfp/axis_tx_0
 ad_connect tx_stream_fifo/s_axis dma_sfp/M_AXIS_MM2S
 
@@ -163,10 +175,13 @@ ad_connect ethernet_sfp/ctl_rx_systemtimerin_0 ctl_rx_systemtimerin_0
 ad_cpu_interconnect 0x82100000 ethernet_sfp
 ad_cpu_interconnect 0x82200000 dma_sfp
 ad_cpu_interconnect 0x82300000 ptp_timer_syncer_0
+ad_cpu_interconnect 0x82400000 axi_gpio_qpllreset
+ad_cpu_interconnect 0x82500000 axi_pl_iic
 
 ad_cpu_interrupt ps-0 mb-0 dma_sfp/mm2s_introut
 ad_cpu_interrupt ps-1 mb-1 dma_sfp/s2mm_introut
 ad_cpu_interrupt ps-2 mb-2 ptp_timer_syncer_0/tod_intr
+ad_cpu_interrupt ps-3 mb-3 axi_pl_iic/iic2intc_irpt
 
 ad_mem_hp0_interconnect sys_cpu_clk sys_ps7/S_AXI_HP0
 ad_mem_hp0_interconnect sys_cpu_clk dma_sfp/M_AXI_SG
