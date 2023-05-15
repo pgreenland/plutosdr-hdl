@@ -1,5 +1,7 @@
 # User guide for [check_guideline.py](https://github.com/analogdevicesinc/hdl/tree/master/.github/scripts/check_guideline.py)
 
+###### Copyright (c) 2022 - 2023 Analog Devices, Inc. All rights reserved.
+
 ## Prerequisites
 
 * the script must be run while being in the root directory (/hdl)

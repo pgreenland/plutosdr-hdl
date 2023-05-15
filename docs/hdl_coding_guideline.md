@@ -1,5 +1,6 @@
 # HDL Coding Guidelines
 
+###### Copyright (c) 2022 - 2023 Analog Devices, Inc. All rights reserved.
 
 ##  Introduction
 

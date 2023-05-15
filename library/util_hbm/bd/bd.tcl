@@ -1,3 +1,38 @@
+## ***************************************************************************
+## ***************************************************************************
+## Copyright 2014 - 2023 (c) Analog Devices, Inc. All rights reserved.
+##
+## In this HDL repository, there are many different and unique modules, consisting
+## of various HDL (Verilog or VHDL) components. The individual modules are
+## developed independently, and may be accompanied by separate and unique license
+## terms.
+##
+## The user should read each of these license terms, and understand the
+## freedoms and responsibilities that he or she has by using this source/core.
+##
+## This core is distributed in the hope that it will be useful, but WITHOUT ANY
+## WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+## A PARTICULAR PURPOSE.
+##
+## Redistribution and use of source or resulting binaries, with or without modification
+## of this file, are permitted under one of the following two license terms:
+##
+##   1. The GNU General Public License version 2 as published by the
+##      Free Software Foundation, which can be found in the top level directory
+##      of this repository (LICENSE_GPL2), and also online at:
+##      <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
+##
+## OR
+##
+##   2. An ADI specific BSD license, which can be found in the top level directory
+##      of this repository (LICENSE_ADIBSD), and also on-line at:
+##      https://github.com/analogdevicesinc/hdl/blob/master/LICENSE_ADIBSD
+##      This will allow to generate bit files and not release the source code,
+##      as long as it attaches to an ADI device.
+##
+## ***************************************************************************
+## ***************************************************************************
+
 proc init {cellpath otherInfo} {
   set ip [get_bd_cells $cellpath]
 
@@ -44,7 +79,7 @@ proc post_config_ip {cellpath otherinfo} {
     if {$src_width != $dst_width} {
       bd::send_msg -of $cellpath -type ERROR -msg_id 1 -text ": For multi AXI master configuration the Source AXIS interface width ($src_width) must match the Destination AXIS interface width ($dst_width)  ."
     } else {
-      # AXIS Data widths divided by number of masters must be >= 8 and power of 2 
+      # AXIS Data widths divided by number of masters must be >= 8 and power of 2
       set bits_per_master [expr $src_width/$num_m]
       if {$bits_per_master < 8} {
         bd::send_msg -of $cellpath -type ERROR -msg_id 2 -text ": Number of AXI masters ($num_m) too high. AXIS data widths divided by number of masters ($src_width / $num_m = $bits_per_master) must be >= 8 ."

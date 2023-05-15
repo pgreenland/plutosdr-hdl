@@ -1,3 +1,38 @@
+## ***************************************************************************
+## ***************************************************************************
+## Copyright 2014 - 2023 (c) Analog Devices, Inc. All rights reserved.
+##
+## In this HDL repository, there are many different and unique modules, consisting
+## of various HDL (Verilog or VHDL) components. The individual modules are
+## developed independently, and may be accompanied by separate and unique license
+## terms.
+##
+## The user should read each of these license terms, and understand the
+## freedoms and responsibilities that he or she has by using this source/core.
+##
+## This core is distributed in the hope that it will be useful, but WITHOUT ANY
+## WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+## A PARTICULAR PURPOSE.
+##
+## Redistribution and use of source or resulting binaries, with or without modification
+## of this file, are permitted under one of the following two license terms:
+##
+##   1. The GNU General Public License version 2 as published by the
+##      Free Software Foundation, which can be found in the top level directory
+##      of this repository (LICENSE_GPL2), and also online at:
+##      <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
+##
+## OR
+##
+##   2. An ADI specific BSD license, which can be found in the top level directory
+##      of this repository (LICENSE_ADIBSD), and also on-line at:
+##      https://github.com/analogdevicesinc/hdl/blob/master/LICENSE_ADIBSD
+##      This will allow to generate bit files and not release the source code,
+##      as long as it attaches to an ADI device.
+##
+## ***************************************************************************
+## ***************************************************************************
+
 ###############################################################################
 # CPLL - generate reference clocks for a given Lane Rate
 #
@@ -290,7 +325,7 @@ proc ad_gth_generator { {lane_rate_l {}} {pll_type {}}  {ref_clk_l {}} } {
             set float_clk [format "%.3f" [expr {$ref_clk}]]
 
             create_ip -name gtwizard -vendor xilinx.com -library ip -version 3.6 -module_name $ip_name
-            
+
             set_property -dict [list \
             CONFIG.identical_protocol_file {JESD204} \
             CONFIG.identical_val_tx_reference_clock $float_clk \
@@ -353,7 +388,7 @@ proc ad_gth_generator { {lane_rate_l {}} {pll_type {}}  {ref_clk_l {}} } {
             CONFIG.gt0_val_align_comma_enable {1111111111} \
             ] [get_ips $ip_name]
 
-           puts "\n IP generated \n" 
+           puts "\n IP generated \n"
 
             ## generate output products and run synthesis
             generate_target all [get_files  \
@@ -406,7 +441,7 @@ proc ad_gth_generator { {lane_rate_l {}} {pll_type {}}  {ref_clk_l {}} } {
                 CONFIG.RX_COMMA_MASK {1111111111} \
             ] [get_ips $ip_name]
 
-           puts "\n IP generated \n" 
+           puts "\n IP generated \n"
 
             ## generate output products and run synthesis
             generate_target all [get_files  \
@@ -474,13 +509,13 @@ proc get_diff_params { {lane_rate_l {}} {pll_type {}}  {ref_clk_l {}} {keep_ip "
     "xcvu37p" {
       set gt_type GTYE4
     }
-    
+
     default {
       puts "ERROR ad_gth_generator: Unsupported device."
       return 1
     }
   }
-  
+
   set current_dir [pwd]
   set project_name [get_property NAME [current_project]]
 
@@ -521,10 +556,10 @@ proc get_diff_params { {lane_rate_l {}} {pll_type {}}  {ref_clk_l {}} {keep_ip "
         }
       }
     } else {
-    puts "\ngenerated files can be find at $project_name\.gen/sources_1/ip" 
+    puts "\ngenerated files can be find at $project_name\.gen/sources_1/ip"
     }
 
-    
+
     puts "\nconfiguration file for the tranciever is $project_name\.gen/sources_1/ip/$gt_type\_cfng.txt"
   }
 
