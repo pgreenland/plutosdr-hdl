@@ -1,5 +1,14 @@
 # create board design
 
+# Add custom repo
+set quantulum_ip_repo_path [file normalize [file join [file dirname [info script]] "../../../hdl-quantulum"]]
+set ip_repo_list [get_property IP_REPO_PATHS [current_fileset]]
+if {[lsearch $ip_repo_list $quantulum_ip_repo_path] == -1} {
+	lappend ip_repo_list $quantulum_ip_repo_path
+	set_property IP_REPO_PATHS $ip_repo_list [current_fileset]
+	update_ip_catalog
+	puts "Added IP Repo: $quantulum_ip_repo_path"
+}
 
 source $ad_hdl_dir/projects/common/xilinx/adi_fir_filter_bd.tcl
 
@@ -211,7 +220,7 @@ ad_ip_instance axi_dmac axi_ad9361_adc_dma
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_TYPE_SRC 2
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_TYPE_DEST 0
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.CYCLIC 0
-ad_ip_parameter axi_ad9361_adc_dma CONFIG.SYNC_TRANSFER_START 0
+ad_ip_parameter axi_ad9361_adc_dma CONFIG.SYNC_TRANSFER_START 1
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.AXI_SLICE_SRC 0
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.AXI_SLICE_DEST 0
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_2D_TRANSFER 0
@@ -221,6 +230,26 @@ ad_add_decimation_filter "rx_fir_decimator" 8 2 1 {61.44} {61.44} \
                          "$ad_hdl_dir/library/util_fir_int/coefile_int.coe"
 ad_ip_instance xlslice decim_slice
 ad_ip_instance util_cpack2 cpack
+ad_ip_instance c_counter_binary counter_timestamp
+ad_ip_parameter counter_timestamp CONFIG.Output_Width 64
+ad_ip_instance util_cpack2_timestamp cpack_timestamp
+ad_ip_instance util_upack2_timestamp upack_timestamp
+ad_ip_instance xlslice cpack_timestamp_every_slice
+ad_ip_parameter cpack_timestamp_every_slice CONFIG.DIN_WIDTH 32
+ad_ip_parameter cpack_timestamp_every_slice CONFIG.DIN_FROM 31
+ad_ip_parameter cpack_timestamp_every_slice CONFIG.DIN_TO 1
+ad_ip_instance xlconcat cpack_timestamp_every_concat
+ad_ip_parameter cpack_timestamp_every_concat CONFIG.NUM_PORTS 2
+ad_ip_parameter cpack_timestamp_every_concat CONFIG.IN0_WIDTH 31
+ad_ip_parameter cpack_timestamp_every_concat CONFIG.IN1_WIDTH 1
+ad_ip_instance xlslice upack_timestamp_every_slice
+ad_ip_parameter upack_timestamp_every_slice CONFIG.DIN_WIDTH 32
+ad_ip_parameter upack_timestamp_every_slice CONFIG.DIN_FROM 31
+ad_ip_parameter upack_timestamp_every_slice CONFIG.DIN_TO 1
+ad_ip_instance xlconcat upack_timestamp_every_concat
+ad_ip_parameter upack_timestamp_every_concat CONFIG.NUM_PORTS 2
+ad_ip_parameter upack_timestamp_every_concat CONFIG.IN0_WIDTH 31
+ad_ip_parameter upack_timestamp_every_concat CONFIG.IN1_WIDTH 1
 
 # connections
 
@@ -248,8 +277,27 @@ ad_connect axi_ad9361/adc_valid_q0 rx_fir_decimator/valid_in_1
 ad_connect axi_ad9361/adc_enable_q0 rx_fir_decimator/enable_in_1
 ad_connect axi_ad9361/adc_data_q0 rx_fir_decimator/data_in_1
 
+ad_connect axi_ad9361/l_clk counter_timestamp/CLK
+ad_connect counter_timestamp/Q cpack_timestamp/timestamp
+ad_connect counter_timestamp/Q upack_timestamp/timestamp
+
+ad_connect axi_ad9361/up_adc_gpio_out cpack_timestamp_every_slice/Din
+ad_connect cpack_timestamp_every_slice/Dout cpack_timestamp_every_concat/In0
+ad_connect GND cpack_timestamp_every_concat/In1
+ad_connect cpack_timestamp_every_concat/dout cpack_timestamp/timestamp_every
+
+ad_connect axi_ad9361/up_dac_gpio_out upack_timestamp_every_slice/Din
+ad_connect upack_timestamp_every_slice/Dout upack_timestamp_every_concat/In0
+ad_connect GND upack_timestamp_every_concat/In1
+ad_connect upack_timestamp_every_concat/dout upack_timestamp/timestamp_every
+
 ad_connect axi_ad9361/l_clk cpack/clk
 ad_connect axi_ad9361/rst cpack/reset
+
+ad_connect sys_cpu_clk cpack_timestamp/dma_clk
+ad_connect sys_cpu_clk upack_timestamp/dma_clk
+ad_connect axi_ad9361/l_clk cpack_timestamp/adc_clk
+ad_connect axi_ad9361/l_clk upack_timestamp/dac_clk
 
 ad_connect axi_ad9361/adc_enable_i1 cpack/enable_2
 ad_connect axi_ad9361/adc_data_i1 cpack/fifo_wr_data_2
@@ -262,7 +310,8 @@ ad_connect cpack/fifo_wr_data_0 rx_fir_decimator/data_out_0
 ad_connect cpack/fifo_wr_data_1 rx_fir_decimator/data_out_1
 ad_connect rx_fir_decimator/valid_out_0 cpack/fifo_wr_en
 
-ad_connect axi_ad9361_adc_dma/fifo_wr cpack/packed_fifo_wr
+ad_connect cpack/packed_fifo_wr cpack_timestamp/packed_fifo_wr
+ad_connect cpack_timestamp/packed_timestamped_fifo_wr axi_ad9361_adc_dma/fifo_wr
 ad_connect axi_ad9361/up_adc_gpio_out decim_slice/Din
 ad_connect rx_fir_decimator/active decim_slice/Dout
 
@@ -276,7 +325,8 @@ ad_connect axi_ad9361/dac_valid_q0 tx_fir_interpolator/dac_valid_1
 ad_connect axi_ad9361/dac_data_q0 tx_fir_interpolator/data_out_1
 
 ad_connect  axi_ad9361/l_clk tx_upack/clk
-ad_connect  axi_ad9361/rst tx_upack/reset
+ad_connect  axi_ad9361/rst upack_timestamp/reset
+ad_connect  upack_timestamp/reset_upack tx_upack/reset
 
 ad_connect  tx_upack/fifo_rd_data_0  tx_fir_interpolator/data_in_0
 ad_connect  tx_upack/enable_0  tx_fir_interpolator/enable_out_0
@@ -288,7 +338,12 @@ ad_connect axi_ad9361/dac_data_i1 tx_upack/fifo_rd_data_2
 ad_connect axi_ad9361/dac_enable_q1 tx_upack/enable_3
 ad_connect axi_ad9361/dac_data_q1 tx_upack/fifo_rd_data_3
 
-ad_connect tx_upack/s_axis  axi_ad9361_dac_dma/m_axis
+ad_connect axi_ad9361_dac_dma/m_axis upack_timestamp/s_axis
+ad_connect upack_timestamp/m_axis tx_upack/s_axis
+
+ad_connect axi_ad9361_dac_dma/m_axis_xfer_req upack_timestamp/s_axis_xfer_req
+
+ad_connect upack_timestamp/discarded_block_count axi_ad9361/up_dac_gpio_in
 
 ad_ip_instance util_vector_logic logic_or [list \
   C_OPERATION {or} \
@@ -302,8 +357,8 @@ ad_connect  tx_upack/fifo_rd_underflow axi_ad9361/dac_dunf
 ad_connect axi_ad9361/up_dac_gpio_out interp_slice/Din
 ad_connect  tx_fir_interpolator/active interp_slice/Dout
 
-ad_connect  axi_ad9361/l_clk axi_ad9361_adc_dma/fifo_wr_clk
-ad_connect  axi_ad9361/l_clk axi_ad9361_dac_dma/m_axis_aclk
+ad_connect  sys_cpu_clk axi_ad9361_adc_dma/fifo_wr_clk
+ad_connect  sys_cpu_clk axi_ad9361_dac_dma/m_axis_aclk
 ad_connect  cpack/fifo_wr_overflow axi_ad9361/adc_dovf
 
 # interconnects
