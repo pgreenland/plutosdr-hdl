@@ -251,6 +251,7 @@ ad_ip_instance xlslice decim_slice
 ad_ip_instance util_cpack2 cpack
 ad_ip_instance c_counter_binary counter_timestamp
 ad_ip_parameter counter_timestamp CONFIG.Output_Width 64
+ad_ip_parameter counter_timestamp CONFIG.CE true
 ad_ip_instance util_cpack2_timestamp cpack_timestamp
 ad_ip_instance util_upack2_timestamp upack_timestamp
 ad_ip_instance xlslice cpack_timestamp_every_slice
@@ -297,6 +298,7 @@ ad_connect axi_ad9361/adc_enable_q0 rx_fir_decimator/enable_in_1
 ad_connect axi_ad9361/adc_data_q0 rx_fir_decimator/data_in_1
 
 ad_connect axi_ad9361/l_clk counter_timestamp/CLK
+ad_connect rx_fir_decimator/valid_out_0 counter_timestamp/CE
 ad_connect counter_timestamp/Q cpack_timestamp/timestamp
 ad_connect counter_timestamp/Q upack_timestamp/timestamp
 
