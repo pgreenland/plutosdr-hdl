@@ -332,9 +332,7 @@ ad_connect cpack/fifo_wr_data_1 rx_fir_decimator/data_out_1
 ad_connect rx_fir_decimator/valid_out_0 cpack/fifo_wr_en
 
 ad_connect cpack/packed_fifo_wr cpack_timestamp/packed_fifo_wr
-ad_connect cpack_timestamp/packed_timestamped_fifo_wr_en axi_ad9361_adc_dma/fifo_wr_en
-ad_connect cpack_timestamp/packed_timestamped_fifo_wr_data axi_ad9361_adc_dma/fifo_wr_data
-ad_connect cpack_timestamp/packed_timestamped_fifo_wr_overflow axi_ad9361_adc_dma/fifo_wr_overflow
+ad_connect cpack_timestamp/packed_timestamped_fifo_wr axi_ad9361_adc_dma/fifo_wr
 ad_connect axi_ad9361/up_adc_gpio_out decim_slice/Din
 ad_connect rx_fir_decimator/active decim_slice/Dout
 
@@ -415,13 +413,26 @@ ad_connect axi_ad9361/l_clk axi_tdd_0/clk
 ad_connect axi_tdd_0/sync_in tdd_ext_sync
 ad_connect axi_tdd_0/tdd_channel_0 txdata_o
 
+# Synchronize tdd_channel_1 into from adc to dma clock domain
+# Note I've not yet tested the tdd feature...hopefully the cdc delay won't impact performance
+# Could use a pulse syncronizer here....I'm hoping that the buffers will typically be large enough
+# for the signal to reset and be re-syncrhonized before the next transfer is triggered
+ad_ip_instance xpm_cdc_gen tdd_channel_1_sync
+ad_ip_parameter tdd_channel_1_sync CONFIG.CDC_TYPE {xpm_cdc_single}
+ad_ip_parameter tdd_channel_1_sync CONFIG.DEST_SYNC_FF {2}
+ad_ip_parameter tdd_channel_1_sync CONFIG.SIM_ASSERT_CHK {false}
+ad_ip_parameter tdd_channel_1_sync CONFIG.SRC_INPUT_REG {false}
+
+ad_connect axi_tdd_0/tdd_channel_1 tdd_channel_1_sync/src_in
+ad_connect axi_ad9361/l_clk tdd_channel_1_sync/src_clk
+ad_connect sys_cpu_clk tdd_channel_1_sync/dest_clk
+
 ad_ip_instance util_vector_logic logic_or_2 [list \
   C_OPERATION {or} \
   C_SIZE 1]
 
 ad_connect  logic_or_2/Op1  cpack_timestamp/packed_timestamped_fifo_wr_sync
-# NOTE: Need to syncronize tdd_channel_1 into DMA clock domain
-ad_connect  logic_or_2/Op2  axi_tdd_0/tdd_channel_1
+ad_connect  logic_or_2/Op2  tdd_channel_1_sync/dest_out
 ad_connect  logic_or_2/Res  axi_ad9361_adc_dma/fifo_wr_sync
 
 ad_connect  logic_or_1/Op1  axi_ad9361/rst
