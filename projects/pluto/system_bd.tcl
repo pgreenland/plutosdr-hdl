@@ -413,27 +413,15 @@ ad_connect axi_ad9361/l_clk axi_tdd_0/clk
 ad_connect axi_tdd_0/sync_in tdd_ext_sync
 ad_connect axi_tdd_0/tdd_channel_0 txdata_o
 
-# Synchronize tdd_channel_1 into from adc to dma clock domain
-# Note I've not yet tested the tdd feature...hopefully the cdc delay won't impact performance
-# Could use a pulse syncronizer here....I'm hoping that the buffers will typically be large enough
-# for the signal to reset and be re-syncrhonized before the next transfer is triggered
-ad_ip_instance xpm_cdc_gen tdd_channel_1_sync
-ad_ip_parameter tdd_channel_1_sync CONFIG.CDC_TYPE {xpm_cdc_single}
-ad_ip_parameter tdd_channel_1_sync CONFIG.DEST_SYNC_FF {2}
-ad_ip_parameter tdd_channel_1_sync CONFIG.SIM_ASSERT_CHK {false}
-ad_ip_parameter tdd_channel_1_sync CONFIG.SRC_INPUT_REG {false}
-
-ad_connect axi_tdd_0/tdd_channel_1 tdd_channel_1_sync/src_in
-ad_connect axi_ad9361/l_clk tdd_channel_1_sync/src_clk
-ad_connect sys_cpu_clk tdd_channel_1_sync/dest_clk
-
-ad_ip_instance util_vector_logic logic_or_2 [list \
-  C_OPERATION {or} \
-  C_SIZE 1]
-
-ad_connect  logic_or_2/Op1  cpack_timestamp/packed_timestamped_fifo_wr_sync
-ad_connect  logic_or_2/Op2  tdd_channel_1_sync/dest_out
-ad_connect  logic_or_2/Res  axi_ad9361_adc_dma/fifo_wr_sync
+# Mux tdd_channel_1 and packed_timestamped_fifo_wr_sync
+# Note that tdd_channel_1 is syncronised into sys_cpu_clk clock domain during this process
+# I've not yet tested the tdd feature...hopefully the cdc delay won't impact performance
+ad_ip_instance util_wr_sync_mux tdd_ts_wr_sync_mux
+ad_connect sys_cpu_clk tdd_ts_wr_sync_mux/clk
+ad_connect cpack_timestamp_every_concat/dout tdd_ts_wr_sync_mux/timestamp_every
+ad_connect cpack_timestamp/packed_timestamped_fifo_wr_sync tdd_ts_wr_sync_mux/timestamp_wr_sync_in
+ad_connect axi_tdd_0/tdd_channel_1 tdd_ts_wr_sync_mux/ext_wr_sync_in
+ad_connect axi_ad9361_adc_dma/fifo_wr_sync tdd_ts_wr_sync_mux/sync_out
 
 ad_connect  logic_or_1/Op1  axi_ad9361/rst
 ad_connect  logic_or_1/Op2  axi_tdd_0/tdd_channel_2
